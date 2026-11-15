@@ -1,0 +1,11 @@
+# Datos pesados (más de 1 GB): se quedan solo en local
+**/datos/
+
+# Python / Jupyter
+__pycache__/
+.ipynb_checkpoints/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
