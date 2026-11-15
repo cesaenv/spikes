@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Humanos frente a bots · Celia Sáenz Villalta</title>
+    <meta name="description" content="Clustering de sesiones de un log web real para distinguir humanos y bots sin usar etiquetas." />
+    <link rel="stylesheet" href="https://cesaenv.github.io/theme.css" />
+    <link rel="stylesheet" href="../shared/research.css" />
+    <link rel="icon" href="https://cesaenv.github.io/favicon.svg" type="image/svg+xml" />
+    <script src="../shared/chrome.js"></script>
+  </head>
+  <body>
+    <main class="container article">
+      <h1>Humanos frente a bots</h1>
+      <p class="lead">¿Se puede distinguir el tráfico humano del de los bots en una web solo por cómo se comportan las visitas?</p>
+      <ul class="tags"><li>Clustering</li><li>k-means · DBSCAN · Ward</li><li>Aprendizaje Automático I</li></ul>
+      <ul class="links">
+        <li><a href="https://github.com/cesaenv/spikes/tree/main/bots-vs-humans">Código y cuadernos</a></li>
+      </ul>
+
+      <h2>Pregunta y datos</h2>
+      <p>Muchos bots se identifican (Googlebot, GPTBot…), pero los scrapers y los agentes de IA envían el <em>user-agent</em> de un Chrome cualquiera. Agrupo las sesiones de un log real sin etiquetas y solo al final compruebo si los grupos coinciden con lo que cada visitante dice ser.</p>
+      <table>
+        <tr><th>Datos</th><td>24 h de una tienda online real: 2,34 M de peticiones → 80 423 sesiones → 16 507 de ordenador</td></tr>
+        <tr><th>Método</th><td>k-means (k = 7) sobre 9 variables de comportamiento; contraste con DBSCAN y Ward</td></tr>
+        <tr><th>Validación</th><td>81,5 % de los bots declarados en grupos automatizados frente al 1,9 % de los navegadores (ARI 0,744)</td></tr>
+        <tr><th>Hallazgo</th><td>229 bots camuflados: <em>user-agent</em> de navegador y comportamiento de bot</td></tr>
+      </table>
+
+      <h2>El ritmo del día</h2>
+      <figure>
+        <img src="figuras/peticiones_dia_2019.png" alt="Peticiones por hora a lo largo del día" />
+        <figcaption>El tráfico humano sigue el ciclo del día; los bots mantienen el mismo ritmo de día y de noche.</figcaption>
+      </figure>
+
+      <h2>Elección de k</h2>
+      <figure>
+        <img src="figuras/seleccion_k_2019.png" alt="Selección del número de clústeres" />
+        <figcaption>Selección de k con inercia y silhouette.</figcaption>
+      </figure>
+
+      <h2>Tipos de comportamiento</h2>
+      <figure>
+        <img src="figuras/perfil_clusters_2019.png" alt="Perfil de los clústeres de k-means" />
+        <figcaption>Perfil de los siete clústeres: navegación humana, visitas cortas, crawlers, monitorización y accesos con errores.</figcaption>
+      </figure>
+      <figure>
+        <img src="figuras/pca_kmeans_2019.png" alt="Proyección PCA de los clústeres" />
+        <figcaption>Proyección PCA de las sesiones coloreadas por clúster.</figcaption>
+      </figure>
+
+      <h2>Conclusión</h2>
+      <p>El comportamiento basta para separar gran parte del tráfico automatizado sin mirar el <em>user-agent</em>, y el modelo aplicado al día siguiente sin reentrenar mantiene la proporción de tráfico humano (81,3 % frente a 81,8 %).</p>
+    </main>
+  </body>
+</html>
