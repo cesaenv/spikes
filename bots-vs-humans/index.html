@@ -50,6 +50,14 @@
         <figcaption>Proyección PCA de las sesiones coloreadas por clúster.</figcaption>
       </figure>
 
+      <h2>Cuadernos</h2>
+      <p>El método se desarrolla en un cuaderno principal y se aplica en otros dos. Se pueden leer en GitHub con todas sus salidas, sin ejecutar nada.</p>
+      <ul>
+        <li><a href="https://github.com/cesaenv/spikes/blob/main/bots-vs-humans/trabajo_bots_vs_humanos.ipynb"><code>trabajo_bots_vs_humanos.ipynb</code></a>: parseo del log, sesiones, selección de variables, clustering, validación y la herramienta <code>analizar_log</code>. Entrena el modelo con las primeras 24 h del log de 2019.</li>
+        <li><a href="https://github.com/cesaenv/spikes/blob/main/bots-vs-humans/analisis_dia2.ipynb"><code>analisis_dia2.ipynb</code></a>: aplica ese modelo, sin reentrenar, a las 24 h siguientes. Mantiene la proporción de tráfico humano del primer día.</li>
+        <li><a href="https://github.com/cesaenv/spikes/blob/main/bots-vs-humans/comparacion_2025.ipynb"><code>comparacion_2025.ipynb</code></a>: comprueba si el modelo generaliza a un log de 2025 de un organismo público (213 205 peticiones, de finales de septiembre a principios de octubre). Reentrena con esos datos y valida con las reglas de ataque que acompañan al dataset. Es un borrador en revisión.</li>
+      </ul>
+
       <h2>Conclusión</h2>
       <p>El comportamiento basta para separar gran parte del tráfico automatizado sin mirar el <em>user-agent</em>, y el modelo aplicado al día siguiente sin reentrenar mantiene la proporción de tráfico humano (81,3 % frente a 81,8 %).</p>
     </main>
