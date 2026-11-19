@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reconocer dígitos · Celia Sáenz Villalta</title>
+    <meta name="description" content="Una red convolucional entrenada con MNIST que reconoce el número que dibujas o subes, ejecutada entera en tu navegador." />
+    <link rel="stylesheet" href="https://cesaenv.github.io/theme.css" />
+    <link rel="stylesheet" href="../shared/research.css" />
+    <link rel="icon" href="https://cesaenv.github.io/favicon.svg" type="image/svg+xml" />
+    <script src="../shared/chrome.js"></script>
+    <style>
+      .demo {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+        margin: 1.5rem 0;
+        padding: 1.25rem;
+        border: 1px solid var(--border);
+        background: var(--surface);
+      }
+      #lienzo {
+        display: block;
+        width: 100%;
+        max-width: 20rem;
+        aspect-ratio: 1;
+        background: #000;
+        border: 1px solid var(--border);
+        cursor: crosshair;
+        touch-action: none;
+      }
+      .acciones {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+      .acciones button,
+      .acciones label {
+        padding: 0.4rem 0.9rem;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+        font-size: 0.9375rem;
+        cursor: pointer;
+      }
+      .acciones button:hover,
+      .acciones label:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .acciones input[type='file'] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+      }
+      .acciones label:focus-within {
+        outline: 2px solid var(--focus);
+        outline-offset: 3px;
+      }
+      .prediccion {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 0 0 1rem;
+      }
+      .prediccion .num {
+        min-width: 1ch;
+        font-size: 4.5rem;
+        line-height: 1;
+        font-weight: 750;
+        color: var(--accent);
+      }
+      .prediccion .conf {
+        color: var(--muted);
+        font-size: 0.9375rem;
+      }
+      #vista {
+        width: 5.25rem;
+        height: 5.25rem;
+        image-rendering: pixelated;
+        border: 1px solid var(--border);
+        background: #000;
+        margin-left: auto;
+      }
+      .barras {
+        display: grid;
+        gap: 0.25rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        font-size: 0.875rem;
+      }
+      .barras li {
+        display: grid;
+        grid-template-columns: 1.25rem 1fr 3.5rem;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .barras .pista {
+        height: 0.75rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+      }
+      .barras .relleno {
+        height: 100%;
+        width: 0;
+        background: var(--muted);
+      }
+      .barras li.top .relleno {
+        background: var(--accent);
+      }
+      .barras .pct {
+        text-align: right;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .nota {
+        margin: 0.75rem 0 0;
+        color: var(--muted);
+        font-size: 0.875rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container article">
+      <h1>Reconocer dígitos</h1>
+      <p class="lead">¿Qué número es? Dibuja un dígito o sube una foto y una red neuronal entrenada con MNIST lo adivina, sin salir de tu navegador.</p>
+      <ul class="tags"><li>Redes convolucionales</li><li>MNIST</li><li>Visión por computador</li></ul>
+      <ul class="links"><li><a href="entrenar.ipynb">Cuaderno de entrenamiento</a></li><li><a href="modelo/cnn_mnist.json">Pesos del modelo (JSON)</a></li></ul>
+
+      <h2>Pruébalo</h2>
+      <div class="demo">
+        <div>
+          <canvas id="lienzo" width="280" height="280" aria-label="Lienzo para dibujar un dígito"></canvas>
+          <div class="acciones">
+            <button type="button" id="borrar">Borrar</button>
+            <label>Subir imagen<input type="file" id="archivo" accept="image/*" /></label>
+            <button type="button" id="ejemplo">Dígito de prueba</button>
+          </div>
+          <p class="nota">Dibuja con el ratón o el dedo, grande y centrado. Si subes una imagen, mejor una cifra oscura sobre fondo claro (o al revés) y sin nada más.</p>
+        </div>
+        <div aria-live="polite">
+          <div class="prediccion">
+            <span class="num" id="num">–</span>
+            <span class="conf" id="conf">Dibuja algo para empezar</span>
+            <canvas id="vista" width="28" height="28" aria-label="Lo que ve el modelo (28×28)"></canvas>
+          </div>
+          <ul class="barras" id="barras"></ul>
+          <p class="nota">A la derecha, la imagen de 28×28 que recibe la red tras recortar y centrar tu dibujo.</p>
+        </div>
+      </div>
+
+      <h2>Qué hay publicado</h2>
+      <p>Antes de entrenar nada miré qué se ha conseguido ya con este dataset. MNIST son 70 000 imágenes de 28×28 de cifras escritas a mano (60 000 de entrenamiento y 10 000 de test) y está tan trabajado que el techo está en torno al 99,7–99,9 %.</p>
+      <table>
+        <tr><th>Enfoque</th><td>Precisión en test (según cada fuente)</td></tr>
+        <tr><th><a href="https://github.com/ansh941/MnistSimpleCNN">MnistSimpleCNN</a></th><td>Hasta 99,91 % con un conjunto (<em>ensemble</em>) de CNN simples; los modelos sueltos quedan algo por debajo. <a href="https://arxiv.org/abs/2008.10400">Artículo</a></td></tr>
+        <tr><th><a href="https://github.com/prodev717/handwritten_digit_classification">prodev717</a></th><td>≈ 99,7 % con una CNN pequeña tras 5 épocas (dato del autor)</td></tr>
+        <tr><th><a href="https://huggingface.co/developerPratik/mnist-cnn-classifier">developerPratik</a></th><td>99,60 % con una CNN en PyTorch</td></tr>
+        <tr><th>Demos con dibujo en el navegador</th><td><a href="https://github.com/mco-gh/mnist-draw">mnist-draw</a> (TensorFlow.js) y <a href="https://github.com/adiagarwalrock/mnist-digits-web">mnist-digits-web</a> (ONNX): la misma idea que esta página</td></tr>
+      </table>
+      <p class="nota">No he reproducido estas cifras, las doy tal como las publica cada autor. Lo que sí se repite: la red convolucional (varias capas de filtros y <em>pooling</em>) supera con facilidad el 99 %, y los últimos décimos salen de combinar modelos o de aumentar los datos.</p>
+
+      <h2>Mi modelo</h2>
+      <table>
+        <tr><th>Datos</th><td>MNIST (Keras): 60 000 imágenes de entrenamiento y 10 000 de test</td></tr>
+        <tr><th>Red</th><td>2 capas convolucionales (32 y 64 filtros de 3×3) con <em>max-pooling</em>, una capa densa de 128 neuronas y la salida de 10 clases. Unos <span id="params">–</span> parámetros</td></tr>
+        <tr><th>Entrenamiento</th><td>Adam, 30 épocas, <em>dropout</em> y aumento de datos (pequeños desplazamientos, giros y zoom) para que aguante dibujos que no son perfectos</td></tr>
+        <tr><th>Resultado</th><td>Precisión en test: <strong id="acc">–</strong></td></tr>
+        <tr><th>En el navegador</th><td>Los pesos (JSON) se cargan y la red se calcula en JavaScript, sin servidor ni librerías</td></tr>
+      </table>
+
+      <h2>Limitaciones</h2>
+      <p>La precisión de test mide cifras de MNIST, escritas por empleados del censo y estudiantes con un bolígrafo y escaneadas. Un trazo hecho con el ratón o una foto con fondo sucio es otra distribución, y ahí la red puede fallar más de lo que dice la cifra, sobre todo con 1/7, 4/9 o 3/5/8. Por eso el programa recorta, escala y centra el dibujo como se hizo con MNIST antes de pasárselo a la red. Además, la red solo conoce los diez dígitos: si dibujas una letra o un garabato, te dará un número igualmente.</p>
+    </main>
+
+    <script>
+      (function () {
+        var lienzo = document.getElementById('lienzo');
+        var ctx = lienzo.getContext('2d', { willReadFrequently: true });
+        var vista = document.getElementById('vista');
+        var vctx = vista.getContext('2d');
+        var barrasEl = document.getElementById('barras');
+        var modelo = null;
+        var ejemplos = null;
+
+        // ---------- barras de probabilidad ----------
+        var filas = [];
+        for (var d = 0; d < 10; d++) {
+          var li = document.createElement('li');
+          li.innerHTML = '<span>' + d + '</span><span class="pista"><span class="relleno" style="display:block"></span></span><span class="pct">0 %</span>';
+          barrasEl.appendChild(li);
+          filas.push(li);
+        }
+
+        function mostrar(prob) {
+          if (!prob) {
+            document.getElementById('num').textContent = '–';
+            document.getElementById('conf').textContent = 'Dibuja algo para empezar';
+            filas.forEach(function (li) {
+              li.classList.remove('top');
+              li.querySelector('.relleno').style.width = '0';
+              li.querySelector('.pct').textContent = '0 %';
+            });
+            return;
+          }
+          var best = 0;
+          for (var i = 1; i < 10; i++) if (prob[i] > prob[best]) best = i;
+          document.getElementById('num').textContent = best;
+          document.getElementById('conf').textContent = 'Seguridad: ' + (prob[best] * 100).toFixed(1).replace('.', ',') + ' %';
+          filas.forEach(function (li, i) {
+            li.classList.toggle('top', i === best);
+            li.querySelector('.relleno').style.width = (prob[i] * 100).toFixed(1).replace('.', ',') + ' %';
+            li.querySelector('.pct').textContent = (prob[i] * 100).toFixed(1).replace('.', ',') + ' %';
+          });
+        }
+
+        // ---------- red convolucional en JS ----------
+        // Los pesos vienen de Keras: conv [alto][ancho][entrada][salida], denso [entrada][salida]
+        function aplanar(a) {
+          var out = [];
+          (function rec(x) { if (Array.isArray(x)) x.forEach(rec); else out.push(x); })(a);
+          return Float32Array.from(out);
+        }
+
+        function conv(inp, H, W, C, w, b, F) {
+          var oh = H - 2, ow = W - 2, out = new Float32Array(oh * ow * F);
+          for (var y = 0; y < oh; y++)
+            for (var x = 0; x < ow; x++)
+              for (var f = 0; f < F; f++) {
+                var s = b[f];
+                for (var ky = 0; ky < 3; ky++)
+                  for (var kx = 0; kx < 3; kx++) {
+                    var ib = ((y + ky) * W + (x + kx)) * C;
+                    var wb = ((ky * 3 + kx) * C) * F + f;
+                    for (var c = 0; c < C; c++) s += inp[ib + c] * w[wb + c * F];
+                  }
+                out[(y * ow + x) * F + f] = s > 0 ? s : 0;
+              }
+          return out;
+        }
+
+        function pool(inp, H, W, C) {
+          var oh = H >> 1, ow = W >> 1, out = new Float32Array(oh * ow * C);
+          for (var y = 0; y < oh; y++)
+            for (var x = 0; x < ow; x++)
+              for (var c = 0; c < C; c++) {
+                var m = -Infinity;
+                for (var dy = 0; dy < 2; dy++)
+                  for (var dx = 0; dx < 2; dx++) {
+                    var v = inp[((2 * y + dy) * W + 2 * x + dx) * C + c];
+                    if (v > m) m = v;
+                  }
+                out[(y * ow + x) * C + c] = m;
+              }
+          return out;
+        }
+
+        function denso(inp, w, b, n, relu) {
+          var out = new Float32Array(n);
+          for (var j = 0; j < n; j++) out[j] = b[j];
+          for (var i = 0; i < inp.length; i++) {
+            var v = inp[i];
+            if (v === 0) continue;
+            for (var k = 0; k < n; k++) out[k] += v * w[i * n + k];
+          }
+          if (relu) for (var q = 0; q < n; q++) if (out[q] < 0) out[q] = 0;
+          return out;
+        }
+
+        function predecir(px) {
+          var m = modelo;
+          var a = conv(px, 28, 28, 1, m.c1w, m.c1b, 32);
+          a = pool(a, 26, 26, 32);
+          a = conv(a, 13, 13, 32, m.c2w, m.c2b, 64);
+          a = pool(a, 11, 11, 64);
+          a = denso(a, m.f1w, m.f1b, 128, true);
+          var z = denso(a, m.f2w, m.f2b, 10, false);
+          var mx = Math.max.apply(null, z), s = 0, p = new Float32Array(10);
+          for (var i = 0; i < 10; i++) { p[i] = Math.exp(z[i] - mx); s += p[i]; }
+          for (i = 0; i < 10; i++) p[i] /= s;
+          return p;
+        }
+
+        // ---------- preprocesado al estilo MNIST ----------
+        // Recorta la cifra, la escala a 20×20 conservando la proporción y la centra por centro de masas en 28×28
+        function aMnist(gris, W, H) {
+          var x0 = W, x1 = -1, y0 = H, y1 = -1, y, x;
+          for (y = 0; y < H; y++)
+            for (x = 0; x < W; x++)
+              if (gris[y * W + x] > 0.15) {
+                if (x < x0) x0 = x; if (x > x1) x1 = x;
+                if (y < y0) y0 = y; if (y > y1) y1 = y;
+              }
+          if (x1 < 0) return null;
+          var bw = x1 - x0 + 1, bh = y1 - y0 + 1, k = 20 / Math.max(bw, bh);
+          var tw = Math.max(1, Math.round(bw * k)), th = Math.max(1, Math.round(bh * k));
+          var src = document.createElement('canvas');
+          src.width = bw; src.height = bh;
+          var sctx = src.getContext('2d'), img = sctx.createImageData(bw, bh);
+          for (y = 0; y < bh; y++)
+            for (x = 0; x < bw; x++) {
+              var v = Math.round(gris[(y0 + y) * W + x0 + x] * 255), o = (y * bw + x) * 4;
+              img.data[o] = img.data[o + 1] = img.data[o + 2] = v; img.data[o + 3] = 255;
+            }
+          sctx.putImageData(img, 0, 0);
+          var dst = document.createElement('canvas');
+          dst.width = 28; dst.height = 28;
+          var dctx = dst.getContext('2d');
+          dctx.fillStyle = '#000'; dctx.fillRect(0, 0, 28, 28);
+          dctx.imageSmoothingQuality = 'high';
+          dctx.drawImage(src, (28 - tw) / 2, (28 - th) / 2, tw, th);
+          var d = dctx.getImageData(0, 0, 28, 28).data, px = new Float32Array(784), sum = 0, cx = 0, cy = 0;
+          for (var i = 0; i < 784; i++) {
+            px[i] = d[i * 4] / 255; sum += px[i];
+            cx += px[i] * (i % 28); cy += px[i] * Math.floor(i / 28);
+          }
+          // desplazar para que el centro de masas caiga en el (14, 14)
+          var sx = Math.round(14 - cx / sum), sy = Math.round(14 - cy / sum), out = new Float32Array(784);
+          for (y = 0; y < 28; y++)
+            for (x = 0; x < 28; x++) {
+              var yy = y - sy, xx = x - sx;
+              if (yy >= 0 && yy < 28 && xx >= 0 && xx < 28) out[y * 28 + x] = px[yy * 28 + xx];
+            }
+          return out;
+        }
+
+        function pintarVista(px) {
+          var img = vctx.createImageData(28, 28);
+          for (var i = 0; i < 784; i++) {
+            var v = Math.round(px[i] * 255);
+            img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+          }
+          vctx.putImageData(img, 0, 0);
+        }
+
+        function clasificar(gris, W, H) {
+          if (!modelo) return;
+          var px = aMnist(gris, W, H);
+          if (!px) { vctx.clearRect(0, 0, 28, 28); mostrar(null); return; }
+          pintarVista(px);
+          mostrar(predecir(px));
+        }
+
+        function desdeLienzo() {
+          var d = ctx.getImageData(0, 0, 280, 280).data, g = new Float32Array(280 * 280);
+          for (var i = 0; i < g.length; i++) g[i] = d[i * 4] / 255;
+          clasificar(g, 280, 280);
+        }
+
+        // ---------- dibujo ----------
+        function limpiar() {
+          ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 280, 280);
+          vctx.fillStyle = '#000'; vctx.fillRect(0, 0, 28, 28);
+          mostrar(null);
+        }
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        var dibujando = false, ultimo = null, temporizador = null;
+        function pos(e) {
+          var r = lienzo.getBoundingClientRect();
+          return { x: (e.clientX - r.left) * 280 / r.width, y: (e.clientY - r.top) * 280 / r.height };
+        }
+        lienzo.addEventListener('pointerdown', function (e) {
+          dibujando = true; lienzo.setPointerCapture(e.pointerId);
+          ultimo = pos(e);
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 20;
+          ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x + 0.01, ultimo.y); ctx.stroke();
+        });
+        lienzo.addEventListener('pointermove', function (e) {
+          if (!dibujando) return;
+          var p = pos(e);
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 20;
+          ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+          ultimo = p;
+          clearTimeout(temporizador); temporizador = setTimeout(desdeLienzo, 60);
+        });
+        function soltar() { if (dibujando) { dibujando = false; desdeLienzo(); } }
+        lienzo.addEventListener('pointerup', soltar);
+        lienzo.addEventListener('pointercancel', soltar);
+        document.getElementById('borrar').addEventListener('click', limpiar);
+
+        // ---------- subir imagen ----------
+        document.getElementById('archivo').addEventListener('change', function (e) {
+          var f = e.target.files[0];
+          if (!f) return;
+          var img = new Image(), url = URL.createObjectURL(f);
+          img.onload = function () {
+            var s = 280 / Math.max(img.width, img.height), w = img.width * s, h = img.height * s;
+            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 280, 280);
+            ctx.drawImage(img, (280 - w) / 2, (280 - h) / 2, w, h);
+            URL.revokeObjectURL(url);
+            var d = ctx.getImageData(0, 0, 280, 280).data, g = new Float32Array(280 * 280), sum = 0, i;
+            for (i = 0; i < g.length; i++) { g[i] = (0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) / 255; sum += g[i]; }
+            // Si el fondo es claro (media alta), se invierte: la red espera cifra clara sobre fondo oscuro
+            var invertir = sum / g.length > 0.5;
+            if (invertir) for (i = 0; i < g.length; i++) g[i] = 1 - g[i];
+            // estirar el contraste
+            var mn = 1, mx = 0;
+            for (i = 0; i < g.length; i++) { if (g[i] < mn) mn = g[i]; if (g[i] > mx) mx = g[i]; }
+            if (mx - mn > 0.05) for (i = 0; i < g.length; i++) g[i] = (g[i] - mn) / (mx - mn);
+            // lo que se ve en el lienzo es lo que ve el modelo (cifra clara)
+            var o = ctx.createImageData(280, 280);
+            for (i = 0; i < g.length; i++) { var v = Math.round(g[i] * 255); o.data[i * 4] = o.data[i * 4 + 1] = o.data[i * 4 + 2] = v; o.data[i * 4 + 3] = 255; }
+            ctx.putImageData(o, 0, 0);
+            clasificar(g, 280, 280);
+          };
+          img.src = url;
+          e.target.value = '';
+        });
+
+        // ---------- ejemplos del test ----------
+        var siguiente = 0;
+        document.getElementById('ejemplo').addEventListener('click', function () {
+          if (!ejemplos || !modelo) return;
+          var e = ejemplos[siguiente++ % ejemplos.length], px = Float32Array.from(e.px, function (v) { return v / 255; });
+          ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 280, 280);
+          var t = document.createElement('canvas'); t.width = 28; t.height = 28;
+          var tc = t.getContext('2d'), im = tc.createImageData(28, 28);
+          for (var i = 0; i < 784; i++) { im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = e.px[i]; im.data[i * 4 + 3] = 255; }
+          tc.putImageData(im, 0, 0);
+          ctx.imageSmoothingEnabled = false; ctx.drawImage(t, 0, 0, 280, 280); ctx.imageSmoothingEnabled = true;
+          pintarVista(px); mostrar(predecir(px));
+        });
+
+        // ---------- carga ----------
+        limpiar();
+        fetch('modelo/cnn_mnist.json').then(function (r) { return r.json(); }).then(function (j) {
+          modelo = {
+            c1w: aplanar(j.conv1.w), c1b: aplanar(j.conv1.b),
+            c2w: aplanar(j.conv2.w), c2b: aplanar(j.conv2.b),
+            f1w: aplanar(j.fc1.w), f1b: aplanar(j.fc1.b),
+            f2w: aplanar(j.fc2.w), f2b: aplanar(j.fc2.b)
+          };
+          document.getElementById('acc').textContent = (j.test_acc * 100).toFixed(2).replace('.', ',') + ' %';
+          document.getElementById('params').textContent = (modelo.c1w.length + modelo.c1b.length + modelo.c2w.length + modelo.c2b.length +
+            modelo.f1w.length + modelo.f1b.length + modelo.f2w.length + modelo.f2b.length).toLocaleString('es-ES');
+        }).catch(function () {
+          document.getElementById('conf').textContent = 'No se ha podido cargar el modelo (abre la página desde un servidor, no como archivo)';
+        });
+        fetch('modelo/ejemplos.json').then(function (r) { return r.json(); }).then(function (j) { ejemplos = j; }).catch(function () {});
+      })();
+    </script>
+  </body>
+</html>

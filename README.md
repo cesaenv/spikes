@@ -5,6 +5,7 @@ Spikes: pequeñas investigaciones con datos, hechas con HTML y CSS y publicadas 
 Por ahora:
 
 - Humanos frente a bots (clustering de sesiones de un log web)
+- Reconocer dígitos (CNN sobre MNIST con demo de dibujo en el navegador)
 
 ## Cómo está organizado
 
